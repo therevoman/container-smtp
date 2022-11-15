@@ -1,0 +1,56 @@
+FROM golang AS builder
+
+MAINTAINER Nate Revo "nrevo@revoweb.com"
+
+WORKDIR /go/src/github.com/alexellis/href-counter/
+RUN go get -d -v golang.org/x/net/html  
+COPY ./app.go ./go.mod ./
+RUN CGO_ENABLED=0 GOOS=linux go build -a -o app .
+
+FROM registry.access.redhat.com/ubi8/ubi-micro
+#WORKDIR /
+#COPY --from=builder /go/src/github.com/alexellis/href-counter/app /
+
+RUN microdnf install -y exim \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    find /var/log -type f | while read f; do echo -ne '' > $f; done;
+
+COPY entrypoint.sh /bin/
+COPY set-exim4-update-conf /bin/
+
+RUN chmod a+x /bin/entrypoint.sh && \
+    chmod a+x /bin/set-exim4-update-conf
+
+EXPOSE 25
+ENTRYPOINT ["/bin/entrypoint.sh"]
+CMD ["exim", "-bd", "-q15m", "-v"]
+
+
+
+
+
+
+
+##################################
+
+
+
+FROM debian:buster
+
+MAINTAINER Oluwaseun Obajobi "oluwaseun.obajobi@namshi.com"
+
+RUN apt-get update && \
+    apt-get install -y exim4-daemon-light && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    find /var/log -type f | while read f; do echo -ne '' > $f; done;
+
+COPY entrypoint.sh /bin/
+COPY set-exim4-update-conf /bin/
+
+RUN chmod a+x /bin/entrypoint.sh && \
+    chmod a+x /bin/set-exim4-update-conf
+
+EXPOSE 25
+ENTRYPOINT ["/bin/entrypoint.sh"]
+CMD ["exim", "-bd", "-q15m", "-v"]
